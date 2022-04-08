@@ -1,0 +1,68 @@
+version: "3.9"
+networks:
+  otlp-network:
+    driver: bridge
+volumes:
+  sqlserver-storage:
+    driver: local
+services:
+  app:
+    build:
+      context: ./src
+      dockerfile: Dockerfile
+    image: sampleapp:local
+    depends_on:
+      - otel-collector
+      - sqlserver
+    environment:
+      ASPNETCORE_ENVIRONMENT: Development
+      CONNECTIONSTRINGS__DEFAULTCONNECTION: "Server=sqlserver;Database=master;User Id=sa;Password=P@ssw0rd;MultipleActiveResultSets=true;"
+      DOTNET_CLI_TELEMETRY_OPTOUT: 1
+      DOTNET_GENERATE_ASPNET_CERTIFICATE: 0
+      KESTREL__ENDPOINTS__HTTPSINLINECERTANDKEYFILE__URL: "https://*:5443"
+      KESTREL__ENDPOINTS__HTTPSINLINECERTANDKEYFILE__CERTIFICATE__PATH: "/app/cert.pem"
+      KESTREL__ENDPOINTS__HTTPSINLINECERTANDKEYFILE__CERTIFICATE__KEYPATH: "/app/privkey.pem"
+    ports:
+      - "127.0.0.1:5443:5443"
+    networks:
+      - otlp-network
+    extra_hosts:
+      - host.docker.internal:host-gateway
+    volumes:
+      - ./https.crt:/app/cert.pem:ro
+      - ./https.key:/app/privkey.pem:ro
+    restart: unless-stopped
+  jaeger-all-in-one:
+    image: jaegertracing/all-in-one:1.32
+    ports:
+      - 16686:16686
+    networks:
+      - otlp-network
+    restart: unless-stopped
+  otel-collector:
+    image: otel/opentelemetry-collector:0.48.0
+    command: [ "--config=/etc/otel-collector-config.yaml" ]
+    depends_on:
+      - jaeger-all-in-one
+    networks:
+      - otlp-network
+    volumes:
+      - ./otel-collector-config.yaml:/etc/otel-collector-config.yaml:ro
+    restart: unless-stopped
+  sqlserver:
+    image: mcr.microsoft.com/mssql/server:2019-latest
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_PID=Express
+      - SA_PASSWORD=P@ssw0rd
+    networks:
+      - otlp-network
+    volumes:
+      - sqlserver-storage:/var/opt/mssql
+    restart: unless-stopped
+    healthcheck:
+      test: /opt/mssql-tools/bin/sqlcmd -S localhost -U sa -P "$$SA_PASSWORD" -Q "SELECT @@VERSION" || exit 1
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
