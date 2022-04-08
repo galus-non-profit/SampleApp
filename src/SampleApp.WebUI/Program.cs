@@ -14,9 +14,11 @@ var builder = WebApplication.CreateBuilder(args);
 
 builder.Configuration.AddEnvironmentVariables();
 
-builder.Host.UseSerilog((_, lc) =>
+builder.Host.UseSerilog((_, loggerConfiguration) =>
 {
-    lc.Enrich.WithProperty("ServiceVersion", serviceName)
+    loggerConfiguration
+        .Enrich.FromLogContext()
+        .Enrich.WithProperty("ServiceVersion", serviceName)
         .Enrich.WithProperty("ServiceVersion", serviceVersion)
         .WriteTo.Console()
         .WriteTo.Seq("http://host.docker.internal:5341")
