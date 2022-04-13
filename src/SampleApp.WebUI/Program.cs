@@ -1,13 +1,16 @@
+using System.Reflection;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 using OpenTelemetry.Exporter;
 using OpenTelemetry.Instrumentation.AspNetCore;
 using OpenTelemetry.Resources;
 using OpenTelemetry.Trace;
+using SampleApp.WebUI.Behaviors;
 using SampleApp.WebUI.Data;
+using SampleApp.WebUI.Shared;
 using Serilog;
 
-var serviceName = "SampleApp";
+var serviceName = Consts.SERVICE_NAME;
 var serviceVersion = "1.0.0";
 
 var builder = WebApplication.CreateBuilder(args);
@@ -28,6 +31,7 @@ builder.Host.UseSerilog((_, loggerConfiguration) =>
 
 builder.Services.AddHttpLogging(options => options.LoggingFields = Microsoft.AspNetCore.HttpLogging.HttpLoggingFields.All);
 builder.Services.AddHealthChecks();
+builder.Services.AddMediatR(Assembly.GetExecutingAssembly());
 
 builder.Services.Configure<AspNetCoreInstrumentationOptions>(options =>
 {
@@ -70,6 +74,7 @@ builder.Services.AddOpenTelemetryTracing((builder) => builder
     }));
 
 builder.Services.AddSingleton(TracerProvider.Default.GetTracer(serviceName));
+builder.Services.AddTransient(typeof(IPipelineBehavior<,>), typeof(OpenTelemetryBehavior<,>));
 builder.Services.AddHttpContextAccessor();
 
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
@@ -84,6 +89,10 @@ builder.Services.AddControllersWithViews();
 var app = builder.Build();
 app.UseHttpLogging();
 app.UseHealthChecks("/health");
+
+using var serviceScope = app.Services.GetService<IServiceScopeFactory>()!.CreateScope();
+var context = serviceScope.ServiceProvider.GetRequiredService<ApplicationDbContext>();
+context.Database.Migrate();
 
 // Configure the HTTP request pipeline.
 if (app.Environment.IsDevelopment())

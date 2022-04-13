@@ -7,6 +7,13 @@
   </PropertyGroup>
 
   <ItemGroup>
+      <Using Include="MediatR" />
+      <Using Include="System.ComponentModel.DataAnnotations" />
+      <Using Include="System.Text.Json.Serialization" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <PackageReference Include="MediatR.Extensions.Microsoft.DependencyInjection" Version="10.0.1" />
     <PackageReference Include="Microsoft.AspNetCore.Diagnostics.EntityFrameworkCore" Version="6.0.3" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" Version="6.0.3" />
     <PackageReference Include="Microsoft.AspNetCore.Identity.UI" Version="6.0.3" />
